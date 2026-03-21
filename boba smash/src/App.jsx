@@ -19,6 +19,7 @@ const SCREENS = {
   houseSelect: 'houseSelect',
   home: 'home',
   houseDecor: 'houseDecor',
+  gameOverSummary: 'gameOverSummary',
   shop: 'shop',
   cafe: 'cafe',
   gallery: 'gallery',
@@ -157,8 +158,9 @@ function getUpgradeCost(upgradeId, level) {
 
 function moodFromPatience(patience, maxPatience) {
   const ratio = patience / maxPatience
-  if (ratio > 0.65) return '😐'
-  if (ratio > 0.3) return '😠'
+  if (ratio > 0.8) return '😊'
+  if (ratio > 0.5) return '😐'
+  if (ratio > 0.25) return '😠'
   return '🤬'
 }
 
@@ -168,12 +170,14 @@ function getFruitDelay(servedCustomers) {
   return table[tier]
 }
 
-function createFruit(id) {
+function createFruit(id, goldenChance = 0.05) {
   const angle = Math.random() * Math.PI * 2
   const speed = 0.15 + Math.random() * 0.25
+  const isGolden = Math.random() < goldenChance
   return {
     id,
-    kind: FRUITS[Math.floor(Math.random() * FRUITS.length)],
+    kind: isGolden ? '⭐' : FRUITS[Math.floor(Math.random() * FRUITS.length)],
+    golden: isGolden,
     x: 10 + Math.random() * 80,
     y: 10 + Math.random() * 80,
     vx: Math.cos(angle) * speed,
@@ -181,11 +185,11 @@ function createFruit(id) {
   }
 }
 
-function moveFruits(fruits) {
+function moveFruits(fruits, speedMult = 1) {
   return fruits.map((f) => {
     let { x, y, vx, vy } = f
-    x += vx
-    y += vy
+    x += vx * speedMult
+    y += vy * speedMult
     if (x < 5 || x > 95) vx = -vx
     if (y < 5 || y > 95) vy = -vy
     x = Math.max(5, Math.min(95, x))
@@ -201,6 +205,49 @@ function createCustomer(id, patienceBonus) {
     patience: maxPatience,
     maxPatience,
   }
+}
+
+const SFX = {
+  _ctx: null,
+  _getCtx() {
+    if (!this._ctx) this._ctx = new (window.AudioContext || window.webkitAudioContext)()
+    return this._ctx
+  },
+  _beep(freq, duration, type = 'square', volume = 0.12) {
+    try {
+      const ctx = this._getCtx()
+      const osc = ctx.createOscillator()
+      const gain = ctx.createGain()
+      osc.type = type
+      osc.frequency.value = freq
+      gain.gain.value = volume
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + duration)
+      osc.connect(gain)
+      gain.connect(ctx.destination)
+      osc.start(ctx.currentTime)
+      osc.stop(ctx.currentTime + duration)
+    } catch { /* audio not available */ }
+  },
+  tap() { this._beep(880, 0.06, 'square', 0.08) },
+  combo() { this._beep(1200, 0.1, 'sine', 0.1) },
+  serve() { this._beep(660, 0.15, 'sine', 0.15); setTimeout(() => this._beep(880, 0.12, 'sine', 0.12), 100) },
+  drink() { this._beep(523, 0.08, 'triangle', 0.1); setTimeout(() => this._beep(659, 0.08, 'triangle', 0.1), 60) },
+  loseLife() { this._beep(220, 0.25, 'sawtooth', 0.1) },
+  gameOver() { this._beep(330, 0.2, 'square', 0.1); setTimeout(() => this._beep(220, 0.3, 'square', 0.1), 200) },
+  powerUp() { this._beep(523, 0.08, 'sine', 0.12); setTimeout(() => this._beep(784, 0.08, 'sine', 0.12), 80); setTimeout(() => this._beep(1047, 0.12, 'sine', 0.15), 160) },
+}
+
+const CHARACTER_ABILITIES = {
+  mochi: { id: 'patience', label: '+1s patience', apply: (base) => ({ ...base, patienceBonus: base.patienceBonus + 1 }) },
+  boba: { id: 'coins', label: '+3 coins per serve', apply: (base) => ({ ...base, tipBonus: base.tipBonus + 3 }) },
+  pixel: { id: 'speed', label: 'Fruits move slower', apply: (base) => ({ ...base, fruitSpeedMult: 0.7 }) },
+  mango: { id: 'combo', label: 'Combo lasts longer', apply: (base) => ({ ...base, comboTimerMax: 18 }) },
+  chino: { id: 'queue', label: '+1 queue slot', apply: (base) => ({ ...base, queueBonus: base.queueBonus + 1 }) },
+  star: { id: 'luck', label: 'More golden fruits', apply: (base) => ({ ...base, goldenChance: 0.15 }) },
+}
+
+function ScreenFade({ children }) {
+  return <div className="screen-fade">{children}</div>
 }
 
 function PixelButton({ children, onClick, tone = 'gold', disabled = false, type = 'button' }) {
@@ -298,6 +345,10 @@ function CharacterCard({ character, selected, onSelect }) {
     <button className={`character-card ${selected ? 'active' : ''}`} onClick={() => onSelect(character.id)} type="button">
       <div className="card-art">
         <PixelCapybara character={character} variant="select-card" />
+      </div>
+      <div className="card-info">
+        <div className="card-name">{character.name}</div>
+        <div className="card-title">{character.title}</div>
       </div>
     </button>
   )
@@ -964,6 +1015,12 @@ function AvatarScreen({ selectedId, onSelect, onContinue, onToggleMusic, musicEn
               />
             ))}
           </div>
+          {selectedId && (
+            <div className="selected-ability">
+              <strong>{getCharacterById(selectedId).name}</strong>
+              <span className="ability-tag">✨ {CHARACTER_ABILITIES[selectedId]?.label ?? 'No special ability'}</span>
+            </div>
+          )}
           <div className="select-footer">
             <ArrowPrompt text="Tap a capybara to continue" />
             <PixelButton onClick={onContinue}>Accessories</PixelButton>
@@ -1086,7 +1143,7 @@ function AirportScreen({ playerCharacter, accessoryId, onContinue, onToggleMusic
 function ReunionScreen({ playerCharacter, accessoryId, onContinue, onToggleMusic, musicEnabled, audioReady }) {
   const messages = [
     { speaker: 'You', text: 'Hey! I got two tickets to Boba Island. Want to come?' },
-    { speaker: 'Bob', text: "Zes!! Boba Island?! That's where Boba Paradise is! My name is Bob, by the way. Let's go!" },
+    { speaker: 'Bob', text: "Yes!! Boba Island?! That's where Boba Paradise is! My name is Bob, by the way. Let's go!" },
   ]
   const [index, setIndex] = useState(0)
   const finished = index >= messages.length
@@ -1398,6 +1455,12 @@ function GameplayScreen({
   musicEnabled,
   audioReady,
 }) {
+  const charAbility = CHARACTER_ABILITIES[playerCharacter.id] ?? null
+  const abilityStats = (() => {
+    const base = { patienceBonus: 0, tipBonus: 0, fruitSpeedMult: 1, comboTimerMax: 12, queueBonus: 0, goldenChance: 0.05 }
+    return charAbility ? charAbility.apply(base) : base
+  })()
+
   const [game, setGame] = useState(() => ({
     lives: 3,
     served: 0,
@@ -1415,6 +1478,7 @@ function GameplayScreen({
     lastWaveBreak: 0,
     waveBreakPending: false,
     over: false,
+    lifeLostFlash: false,
   }))
   const finishedRef = useRef(false)
   const [paused, setPaused] = useState(false)
@@ -1447,14 +1511,23 @@ function GameplayScreen({
         let coinsEarned = current.coinsEarned
         const floaters = current.floaters.filter((floater) => floater.life > 0).map((floater) => ({ ...floater, life: floater.life - 1 }))
         let activeCustomers = remainingCustomers
+        let lifeLostFlash = current.lifeLostFlash
+
+        if (lostLives > 0) {
+          lifeLostFlash = true
+          SFX.loseLife()
+        } else if (current.lifeLostFlash) {
+          lifeLostFlash = false
+        }
 
         if (readyDrinks > 0 && activeCustomers.length > 0) {
-          const tipValue = 10 + (upgrades.tips * 5)
+          const tipValue = 10 + (upgrades.tips * 5) + abilityStats.tipBonus
           activeCustomers = activeCustomers.slice(1)
           readyDrinks -= 1
           served += 1
           coinsEarned += tipValue
           floaters.push({ id: `${Date.now()}-${served}`, text: `+${tipValue}`, life: 18 })
+          SFX.serve()
         }
 
         const completedWave = served > 0 && served % 5 === 0 ? served / 5 : current.lastWaveBreak
@@ -1466,11 +1539,12 @@ function GameplayScreen({
           coinsEarned,
           readyDrinks,
           customers: activeCustomers,
-          fruits: moveFruits(current.fruits),
+          fruits: moveFruits(current.fruits, abilityStats.fruitSpeedMult),
           floaters,
           pops,
           combo,
           comboTimer,
+          lifeLostFlash,
           lastWaveBreak: completedWave,
           waveBreakPending: served > 0 && served % 5 === 0 && completedWave > current.lastWaveBreak,
           over: lives <= 0,
@@ -1495,7 +1569,7 @@ function GameplayScreen({
         return {
           ...current,
           nextFruitId: current.nextFruitId + 1,
-          fruits: [...current.fruits, createFruit(current.nextFruitId)],
+          fruits: [...current.fruits, createFruit(current.nextFruitId, abilityStats.goldenChance)],
         }
       })
     }, getFruitDelay(game.served))
@@ -1517,11 +1591,13 @@ function GameplayScreen({
           return current
         }
 
-        const capacity = 3 + upgrades.queue
+        const capacity = 3 + upgrades.queue + abilityStats.queueBonus
         if (current.customers.length >= capacity) {
+          SFX.loseLife()
           return {
             ...current,
             lives: current.lives - 1,
+            lifeLostFlash: true,
             over: current.lives - 1 <= 0,
           }
         }
@@ -1529,7 +1605,7 @@ function GameplayScreen({
         return {
           ...current,
           nextCustomerId: current.nextCustomerId + 1,
-          customers: [...current.customers, createCustomer(current.nextCustomerId, upgrades.patience)],
+          customers: [...current.customers, createCustomer(current.nextCustomerId, upgrades.patience + abilityStats.patienceBonus)],
         }
       })
     }, delay)
@@ -1563,11 +1639,19 @@ function GameplayScreen({
 
       const tapped = current.fruits.find((fruit) => fruit.id === fruitId)
       const fruits = current.fruits.filter((fruit) => fruit.id !== fruitId)
-      let fruitProgress = current.fruitProgress + 1
+      const goldenBonus = tapped?.golden ? 2 : 0
+      let fruitProgress = current.fruitProgress + 1 + goldenBonus
       let readyDrinks = current.readyDrinks
       const newCombo = current.combo + 1
-      const comboBonus = newCombo >= 5 ? Math.floor(newCombo / 5) * 2 : 0
-      let coinsEarned = current.coinsEarned + comboBonus
+      const comboBonus = newCombo >= 5 && newCombo % 5 === 0 ? Math.floor(newCombo / 5) * 2 : 0
+      let coinsEarned = current.coinsEarned + comboBonus + (tapped?.golden ? 5 : 0)
+
+      if (tapped?.golden) {
+        SFX.powerUp()
+      } else {
+        SFX.tap()
+      }
+      if (comboBonus > 0) SFX.combo()
 
       const pops = [...current.pops]
       if (tapped) {
@@ -1578,6 +1662,7 @@ function GameplayScreen({
           kind: tapped.kind,
           life: 8,
           combo: newCombo,
+          golden: tapped.golden,
         })
       }
 
@@ -1585,11 +1670,16 @@ function GameplayScreen({
       if (comboBonus > 0 && tapped) {
         floaters.push({ id: `combo-${Date.now()}`, text: `🔥 x${newCombo} +${comboBonus}`, life: 18 })
       }
+      if (tapped?.golden) {
+        floaters.push({ id: `golden-${Date.now()}`, text: '⭐ +5 Golden!', life: 20 })
+      }
 
+      const prevDrinks = readyDrinks
       while (fruitProgress >= 3) {
         fruitProgress -= 3
         readyDrinks += 1
       }
+      if (readyDrinks > prevDrinks) SFX.drink()
 
       return {
         ...current,
@@ -1600,7 +1690,7 @@ function GameplayScreen({
         pops,
         floaters,
         combo: newCombo,
-        comboTimer: 12,
+        comboTimer: abilityStats.comboTimerMax,
       }
     })
   }
@@ -1683,13 +1773,21 @@ function GameplayScreen({
           <div className="hud-chip">🛍️ Spendable: {spendableCoins}</div>
           <div className="hud-chip">👥 Served: {game.served}</div>
           <div className="hud-chip">🌊 Wave: {wave}</div>
-          <div className="boba-lives">
+          {charAbility && <div className="hud-chip ability-chip">✨ {charAbility.label}</div>}
+          <div className={`boba-lives${game.lifeLostFlash ? ' life-flash' : ''}`}>
             {Array.from({ length: 3 }, (_, index) => (
               <span key={index} className={index < game.lives ? 'life-full' : 'life-empty'}>🧋</span>
             ))}
           </div>
-          <div className="order-meter">Drink progress: {game.fruitProgress} / 3</div>
-          <div className="order-meter">Ready drinks: {game.readyDrinks}</div>
+          <div className="drink-progress-bar">
+            <span className="drink-label">Drink</span>
+            <div className="drink-dots">
+              {Array.from({ length: 3 }, (_, index) => (
+                <span key={index} className={`drink-dot${index < game.fruitProgress ? ' filled' : ''}`} />
+              ))}
+            </div>
+          </div>
+          <div className="order-meter">🧋 Ready: {game.readyDrinks}</div>
         </aside>
 
         <div className={`board-frame gameplay-board ${decorClass}`}>
@@ -1712,11 +1810,11 @@ function GameplayScreen({
             ))}
           </div>
 
-          <div className="kitchen-playfield">
+          <div className={`kitchen-playfield${game.lifeLostFlash ? ' playfield-flash' : ''}`}>
             {game.fruits.map((fruit) => (
               <button
                 key={fruit.id}
-                className="fruit-sprite gameplay-fruit"
+                className={`fruit-sprite gameplay-fruit${fruit.golden ? ' golden-fruit' : ''}`}
                 type="button"
                 style={{ left: `${fruit.x}%`, top: `${fruit.y}%` }}
                 onClick={() => tapFruit(fruit.id)}
@@ -1725,7 +1823,7 @@ function GameplayScreen({
               </button>
             ))}
             {game.pops.map((pop) => (
-              <div key={pop.id} className="fruit-pop" style={{ left: `${pop.x}%`, top: `${pop.y}%`, opacity: pop.life / 8 }}>
+              <div key={pop.id} className={`fruit-pop${pop.golden ? ' golden-pop' : ''}`} style={{ left: `${pop.x}%`, top: `${pop.y}%`, opacity: pop.life / 8 }}>
                 {pop.kind}
               </div>
             ))}
@@ -1735,12 +1833,17 @@ function GameplayScreen({
               </div>
             ))}
             {game.combo >= 3 && (
-              <div className="combo-indicator">🔥 x{game.combo}</div>
+              <div className="combo-indicator">
+                🔥 x{game.combo}
+                <div className="combo-timer-bar">
+                  <span style={{ width: `${(game.comboTimer / abilityStats.comboTimerMax) * 100}%` }} />
+                </div>
+              </div>
             )}
           </div>
 
           <div className="play-hint">
-            Tap fruit with your mouse or finger. The more you play, the faster they spawn.
+            {wave <= 1 ? 'Tap fruit to make drinks. 3 fruits = 1 boba tea!' : `Wave ${wave} — keep tapping!`}
           </div>
 
           {interactionLocked ? (
@@ -1835,6 +1938,47 @@ function GameplayScreen({
   )
 }
 
+function GameOverSummaryScreen({
+  playerCharacter,
+  accessoryId,
+  lastRun,
+  bestCustomers,
+  onContinue,
+  onToggleMusic,
+  musicEnabled,
+  audioReady,
+}) {
+  const isNewBest = lastRun && lastRun.customersServed >= bestCustomers && lastRun.customersServed > 0
+
+  return (
+    <SceneShell onToggleMusic={onToggleMusic} musicEnabled={musicEnabled} audioReady={audioReady}>
+      <ScreenFade>
+        <div className="story-grid shop-layout">
+          <div className="board-frame shop-board game-over-board">
+            <Logo subtitle="Shift Over" compact />
+            <div className="game-over-capy">
+              <PixelCapybara character={playerCharacter} accessory={accessoryId} className="preview-capy" motion="idle" variant="scene" />
+            </div>
+            <div className="game-over-message">
+              {lastRun?.reason === 'gameover' ? 'The kitchen got too busy!' : 'Great shift!'}
+            </div>
+            {isNewBest && <div className="new-best-badge">New Best!</div>}
+            <div className="shop-summary game-over-stats">
+              <div className="result-chip"><span>Coins Earned</span><strong>{lastRun?.coinsEarned ?? 0} 🪙</strong></div>
+              <div className="result-chip"><span>Customers</span><strong>{lastRun?.customersServed ?? 0}</strong></div>
+              <div className="result-chip"><span>Wave</span><strong>{lastRun?.wave ?? 1}</strong></div>
+              <div className="result-chip"><span>Best Ever</span><strong>{bestCustomers}</strong></div>
+            </div>
+            <div className="results-actions">
+              <PixelButton onClick={onContinue} tone="green">Continue</PixelButton>
+            </div>
+          </div>
+        </div>
+      </ScreenFade>
+    </SceneShell>
+  )
+}
+
 function ShopScreen({
   coins,
   upgrades,
@@ -1895,13 +2039,13 @@ function WalkGalleryScreen({ onToggleMusic, musicEnabled, audioReady }) {
         <div className="board-frame gallery-board">
           <Logo subtitle="Walk Animation Gallery" compact />
           <p className="gallery-copy">
-            All traced island characters are shown here on loop, plus every accessory permutation for the six playable capybaras.
+            Meet all the island characters and try every accessory combo!
           </p>
           <div className="gallery-bob-panel">
             <div className="gallery-bob-copy">
               <div className="gallery-label">Bob</div>
               <p className="gallery-caption">
-                Bob now uses the extracted Boba Pug art from the matching source sheet.
+                Your loyal island guide and boba fan extraordinaire.
               </p>
             </div>
             <div className="gallery-track bob-track">
@@ -1969,7 +2113,7 @@ function WalkGalleryScreen({ onToggleMusic, musicEnabled, audioReady }) {
 
 function AppFooter({ screen, onOpenGallery, onReturnFromGallery }) {
   const viewingGallery = screen === SCREENS.gallery
-  const hideInGameplay = screen === SCREENS.gameplay
+  const hideInGameplay = screen === SCREENS.gameplay || screen === SCREENS.gameOverSummary
 
   if (hideInGameplay) return null
 
@@ -2093,6 +2237,11 @@ export default function App() {
     }
 
     setCoins((current) => current + summary.coinsEarned)
+    SFX.gameOver()
+    setScreen(SCREENS.gameOverSummary)
+  }
+
+  function continueFromGameOver() {
     setScreen(SCREENS.shop)
   }
 
@@ -2112,46 +2261,46 @@ export default function App() {
       <div className="pixel-scanlines" />
 
       {screen === SCREENS.title ? (
-        <TitleScreen
+        <ScreenFade key="title"><TitleScreen
           onStart={beginStory}
           onSkip={skipToKitchen}
           onToggleMusic={togglePlayback}
           musicEnabled={musicEnabled}
           audioReady={audioReady}
-        />
+        /></ScreenFade>
       ) : null}
 
       {screen === SCREENS.loading ? (
-        <LoadingScreen
+        <ScreenFade key="loading"><LoadingScreen
           onLoaded={() => setScreen(SCREENS.intro)}
           onToggleMusic={togglePlayback}
           musicEnabled={musicEnabled}
           audioReady={audioReady}
-        />
+        /></ScreenFade>
       ) : null}
 
       {screen === SCREENS.intro ? (
-        <IntroScreen
+        <ScreenFade key="intro"><IntroScreen
           onContinue={() => setScreen(SCREENS.avatar)}
           onToggleMusic={togglePlayback}
           musicEnabled={musicEnabled}
           audioReady={audioReady}
-        />
+        /></ScreenFade>
       ) : null}
 
       {screen === SCREENS.avatar ? (
-        <AvatarScreen
+        <ScreenFade key="avatar"><AvatarScreen
           selectedId={selectedId}
           onSelect={setSelectedId}
           onContinue={() => setScreen(SCREENS.accessories)}
           onToggleMusic={togglePlayback}
           musicEnabled={musicEnabled}
           audioReady={audioReady}
-        />
+        /></ScreenFade>
       ) : null}
 
       {screen === SCREENS.accessories ? (
-        <AccessoriesScreen
+        <ScreenFade key="accessories"><AccessoriesScreen
           character={selectedCharacter}
           accessoryId={accessoryId}
           onSelectAccessory={setAccessoryId}
@@ -2159,33 +2308,33 @@ export default function App() {
           onToggleMusic={togglePlayback}
           musicEnabled={musicEnabled}
           audioReady={audioReady}
-        />
+        /></ScreenFade>
       ) : null}
 
       {screen === SCREENS.airport ? (
-        <AirportScreen
+        <ScreenFade key="airport"><AirportScreen
           playerCharacter={selectedCharacter}
           accessoryId={accessoryId}
           onContinue={() => setScreen(SCREENS.reunion)}
           onToggleMusic={togglePlayback}
           musicEnabled={musicEnabled}
           audioReady={audioReady}
-        />
+        /></ScreenFade>
       ) : null}
 
       {screen === SCREENS.reunion ? (
-        <ReunionScreen
+        <ScreenFade key="reunion"><ReunionScreen
           playerCharacter={selectedCharacter}
           accessoryId={accessoryId}
           onContinue={() => setScreen(SCREENS.plane)}
           onToggleMusic={togglePlayback}
           musicEnabled={musicEnabled}
           audioReady={audioReady}
-        />
+        /></ScreenFade>
       ) : null}
 
       {screen === SCREENS.plane ? (
-        <PlaneScreen
+        <ScreenFade key="plane"><PlaneScreen
           playerCharacter={selectedCharacter}
           accessoryId={accessoryId}
           playerName={playerName}
@@ -2194,11 +2343,11 @@ export default function App() {
           onToggleMusic={togglePlayback}
           musicEnabled={musicEnabled}
           audioReady={audioReady}
-        />
+        /></ScreenFade>
       ) : null}
 
       {screen === SCREENS.arrival ? (
-        <ArrivalScreen
+        <ScreenFade key="arrival"><ArrivalScreen
           playerCharacter={selectedCharacter}
           accessoryId={accessoryId}
           playerName={playerName}
@@ -2208,20 +2357,20 @@ export default function App() {
           onToggleMusic={togglePlayback}
           musicEnabled={musicEnabled}
           audioReady={audioReady}
-        />
+        /></ScreenFade>
       ) : null}
 
       {screen === SCREENS.tutorial ? (
-        <TutorialScreen
+        <ScreenFade key="tutorial"><TutorialScreen
           onComplete={() => setScreen(SCREENS.gameplay)}
           onToggleMusic={togglePlayback}
           musicEnabled={musicEnabled}
           audioReady={audioReady}
-        />
+        /></ScreenFade>
       ) : null}
 
       {screen === SCREENS.firstReward ? (
-        <FirstRewardScreen
+        <ScreenFade key="firstReward"><FirstRewardScreen
           playerCharacter={selectedCharacter}
           accessoryId={accessoryId}
           coins={coins}
@@ -2230,22 +2379,22 @@ export default function App() {
           onToggleMusic={togglePlayback}
           musicEnabled={musicEnabled}
           audioReady={audioReady}
-        />
+        /></ScreenFade>
       ) : null}
 
       {screen === SCREENS.houseSelect ? (
-        <HouseSelectScreen
+        <ScreenFade key="houseSelect"><HouseSelectScreen
           coins={coins}
           houseId={houseId}
           onBuyHouse={buyHouse}
           onToggleMusic={togglePlayback}
           musicEnabled={musicEnabled}
           audioReady={audioReady}
-        />
+        /></ScreenFade>
       ) : null}
 
       {screen === SCREENS.home ? (
-        <HomeScreen
+        <ScreenFade key="home"><HomeScreen
           playerCharacter={selectedCharacter}
           accessoryId={accessoryId}
           coins={coins}
@@ -2256,11 +2405,11 @@ export default function App() {
           onToggleMusic={togglePlayback}
           musicEnabled={musicEnabled}
           audioReady={audioReady}
-        />
+        /></ScreenFade>
       ) : null}
 
       {screen === SCREENS.houseDecor ? (
-        <HouseDecorScreen
+        <ScreenFade key="houseDecor"><HouseDecorScreen
           playerCharacter={selectedCharacter}
           accessoryId={accessoryId}
           coins={coins}
@@ -2272,7 +2421,7 @@ export default function App() {
           onToggleMusic={togglePlayback}
           musicEnabled={musicEnabled}
           audioReady={audioReady}
-        />
+        /></ScreenFade>
       ) : null}
 
       {screen === SCREENS.gameplay ? (
@@ -2292,8 +2441,21 @@ export default function App() {
         />
       ) : null}
 
+      {screen === SCREENS.gameOverSummary ? (
+        <ScreenFade key="gameOverSummary"><GameOverSummaryScreen
+          playerCharacter={selectedCharacter}
+          accessoryId={accessoryId}
+          lastRun={lastRun}
+          bestCustomers={bestCustomers}
+          onContinue={continueFromGameOver}
+          onToggleMusic={togglePlayback}
+          musicEnabled={musicEnabled}
+          audioReady={audioReady}
+        /></ScreenFade>
+      ) : null}
+
       {screen === SCREENS.shop ? (
-        <ShopScreen
+        <ScreenFade key="shop"><ShopScreen
           coins={coins}
           upgrades={upgrades}
           lastRun={lastRun}
@@ -2305,11 +2467,11 @@ export default function App() {
           onToggleMusic={togglePlayback}
           musicEnabled={musicEnabled}
           audioReady={audioReady}
-        />
+        /></ScreenFade>
       ) : null}
 
       {screen === SCREENS.cafe ? (
-        <CafeScreen
+        <ScreenFade key="cafe"><CafeScreen
           playerCharacter={selectedCharacter}
           coins={coins}
           upgrades={upgrades}
@@ -2319,15 +2481,15 @@ export default function App() {
           onToggleMusic={togglePlayback}
           musicEnabled={musicEnabled}
           audioReady={audioReady}
-        />
+        /></ScreenFade>
       ) : null}
 
       {screen === SCREENS.gallery ? (
-        <WalkGalleryScreen
+        <ScreenFade key="gallery"><WalkGalleryScreen
           onToggleMusic={togglePlayback}
           musicEnabled={musicEnabled}
           audioReady={audioReady}
-        />
+        /></ScreenFade>
       ) : null}
 
       <AppFooter
