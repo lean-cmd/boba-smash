@@ -5008,4 +5008,219 @@ input {
 
 .game-over-stats {
   margin: 0.75rem 0;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.game-over-stats .result-chip {
+  flex: 0 0 auto;
+  min-width: 100px;
+}
+
+/* Customer names */
+.customer-name {
+  font-family: 'Press Start 2P', monospace;
+  font-size: clamp(0.3rem, 0.8vw, 0.4rem);
+  color: #8a6530;
+  text-align: center;
+  margin-top: 0.1rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Special order badge */
+.special-order-badge {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  font-size: 1rem;
+  animation: specialOrderBounce 1s ease-in-out infinite alternate;
+  z-index: 3;
+  filter: drop-shadow(0 1px 2px rgba(0,0,0,0.3));
+}
+
+@keyframes specialOrderBounce {
+  from { transform: translateY(0); }
+  to { transform: translateY(-3px); }
+}
+
+/* Drink particles */
+.drink-particle {
+  position: absolute;
+  font-size: clamp(0.6rem, 2vw, 1rem);
+  pointer-events: none;
+  z-index: 10;
+  animation: particleFloat 0.3s ease-out;
+}
+
+@keyframes particleFloat {
+  from { transform: scale(0.5); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}
+
+/* Achievement toast */
+.achievement-toast {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  background: linear-gradient(135deg, #fff8d0, #ffe0a0);
+  border: 2px solid #c89d4a;
+  border-radius: 8px;
+  margin: 0.25rem 0.5rem;
+  animation: achievementSlide 0.4s ease-out;
+  font-family: 'Press Start 2P', monospace;
+}
+
+.achievement-toast .achievement-icon {
+  font-size: 1.5rem;
+}
+
+.achievement-toast strong {
+  font-size: clamp(0.4rem, 1vw, 0.55rem);
+  color: #5c3210;
+  display: block;
+}
+
+.achievement-toast p {
+  font-size: clamp(0.3rem, 0.8vw, 0.4rem);
+  color: #8a6530;
+  margin: 0.15rem 0 0;
+}
+
+@keyframes achievementSlide {
+  from { transform: translateX(100%); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
+}
+
+/* Game over achievements */
+.game-over-achievements {
+  margin: 0.75rem 0;
+  text-align: center;
+}
+
+.achievements-title {
+  font-family: 'Press Start 2P', monospace;
+  font-size: clamp(0.45rem, 1.2vw, 0.6rem);
+  color: #5c3210;
+  margin-bottom: 0.5rem;
+}
+
+.achievements-grid {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.4rem;
+}
+
+.achievement-badge {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.25rem 0.5rem;
+  background: linear-gradient(135deg, #fff8e0, #ffe6b0);
+  border: 2px solid #c89d4a;
+  border-radius: 6px;
+  font-family: 'Press Start 2P', monospace;
+  font-size: clamp(0.3rem, 0.9vw, 0.45rem);
+  color: #5c3210;
+  animation: badgeAppear 0.3s ease-out both;
+}
+
+.achievement-badge .achievement-icon {
+  font-size: 1rem;
+}
+
+.achievement-badge .achievement-name {
+  white-space: nowrap;
+}
+
+@keyframes badgeAppear {
+  from { transform: scale(0.8); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}
+
+/* Responsive gameplay improvements */
+@media (max-width: 600px) {
+  .gameplay-layout {
+    grid-template-columns: 1fr !important;
+  }
+
+  .gameplay-sidebar {
+    display: flex !important;
+    flex-direction: row !important;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 0.3rem;
+    padding: 0.5rem !important;
+  }
+
+  .gameplay-sidebar .logo-stack {
+    display: none;
+  }
+
+  .gameplay-sidebar .preview-capy {
+    display: none;
+  }
+
+  .gameplay-sidebar .hud-chip {
+    font-size: clamp(0.35rem, 2.5vw, 0.5rem);
+    padding: 0.2rem 0.4rem;
+    margin: 0;
+  }
+
+  .gameplay-sidebar .boba-lives {
+    margin: 0;
+  }
+
+  .gameplay-sidebar .drink-progress-bar {
+    padding: 0.2rem 0.4rem;
+  }
+
+  .gameplay-sidebar .order-meter {
+    font-size: clamp(0.35rem, 2.5vw, 0.5rem);
+    padding: 0.2rem 0.4rem;
+    margin: 0;
+  }
+
+  .kitchen-playfield {
+    min-height: 280px;
+  }
+
+  .queue-strip {
+    gap: 0.3rem;
+  }
+
+  .customer-card {
+    min-width: 65px;
+    padding: 0.2rem;
+  }
+
+  .customer-capy {
+    width: 40px !important;
+    height: 40px !important;
+  }
+
+  .fruit-sprite {
+    font-size: clamp(1.5rem, 8vw, 2.5rem) !important;
+  }
+
+  .game-over-stats {
+    gap: 0.3rem;
+  }
+
+  .game-over-stats .result-chip {
+    min-width: 80px;
+    font-size: clamp(0.35rem, 2vw, 0.5rem);
+  }
+
+  .achievements-grid {
+    gap: 0.25rem;
+  }
+
+  .achievement-badge {
+    font-size: clamp(0.25rem, 2vw, 0.4rem);
+    padding: 0.2rem 0.35rem;
+  }
 }

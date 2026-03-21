@@ -153,7 +153,7 @@ function getHouseById(houseId) {
 
 function getUpgradeCost(upgradeId, level) {
   const definition = UPGRADE_DEFS.find((upgrade) => upgrade.id === upgradeId)
-  return definition.baseCost * (2 ** level)
+  return Math.round(definition.baseCost * (1 + level * 0.8))
 }
 
 function moodFromPatience(patience, maxPatience) {
@@ -198,12 +198,15 @@ function moveFruits(fruits, speedMult = 1) {
   })
 }
 
-function createCustomer(id, patienceBonus) {
+function createCustomer(id, patienceBonus, servedCount) {
   const maxPatience = 8 + (patienceBonus * 0.5)
+  const specialOrder = createSpecialOrder(servedCount ?? 0)
   return {
     id,
+    name: CUSTOMER_NAMES[(id - 1) % CUSTOMER_NAMES.length],
     patience: maxPatience,
     maxPatience,
+    specialOrder,
   }
 }
 
@@ -244,6 +247,36 @@ const CHARACTER_ABILITIES = {
   mango: { id: 'combo', label: 'Combo lasts longer', apply: (base) => ({ ...base, comboTimerMax: 18 }) },
   chino: { id: 'queue', label: '+1 queue slot', apply: (base) => ({ ...base, queueBonus: base.queueBonus + 1 }) },
   star: { id: 'luck', label: 'More golden fruits', apply: (base) => ({ ...base, goldenChance: 0.15 }) },
+}
+
+const ACHIEVEMENTS = [
+  { id: 'first_serve', name: 'First Boba!', icon: '🧋', description: 'Serve your first customer', check: (s) => s.served >= 1 },
+  { id: 'combo_5', name: 'Combo Starter', icon: '🔥', description: 'Reach a 5x combo', check: (s) => s.maxCombo >= 5 },
+  { id: 'combo_10', name: 'Combo King', icon: '👑', description: 'Reach a 10x combo', check: (s) => s.maxCombo >= 10 },
+  { id: 'combo_20', name: 'Combo Legend', icon: '🌟', description: 'Reach a 20x combo', check: (s) => s.maxCombo >= 20 },
+  { id: 'wave_3', name: 'Wave Rider', icon: '🌊', description: 'Reach wave 3', check: (s) => s.wave >= 3 },
+  { id: 'wave_5', name: 'Wave Master', icon: '🏄', description: 'Reach wave 5', check: (s) => s.wave >= 5 },
+  { id: 'golden_5', name: 'Gold Rush', icon: '⭐', description: 'Catch 5 golden fruits in one run', check: (s) => s.goldenCaught >= 5 },
+  { id: 'serve_10', name: 'Busy Barista', icon: '☕', description: 'Serve 10 customers in one run', check: (s) => s.served >= 10 },
+  { id: 'serve_25', name: 'Cafe Hero', icon: '🦸', description: 'Serve 25 customers in one run', check: (s) => s.served >= 25 },
+  { id: 'perfect_wave', name: 'Perfect Wave', icon: '✨', description: 'Complete a wave with no life loss', check: (s) => s.perfectWaves >= 1 },
+  { id: 'coins_100', name: 'Coin Collector', icon: '💰', description: 'Earn 100 coins in one run', check: (s) => s.coinsEarned >= 100 },
+  { id: 'coins_500', name: 'Rich Capy', icon: '🤑', description: 'Earn 500 coins in one run', check: (s) => s.coinsEarned >= 500 },
+]
+
+const SPECIAL_ORDERS = [
+  { id: 'berry_blast', name: 'Berry Blast', fruits: ['🍓', '🫐'], icon: '🍇', bonus: 8, description: 'Strawberry + Blueberry' },
+  { id: 'tropical_mix', name: 'Tropical Mix', fruits: ['🥭', '🍑'], icon: '🌴', bonus: 8, description: 'Mango + Peach' },
+  { id: 'island_special', name: 'Island Special', fruits: ['🥝', '🥭'], icon: '🏝️', bonus: 10, description: 'Kiwi + Mango' },
+  { id: 'sunset_sip', name: 'Sunset Sip', fruits: ['🍑', '🍓'], icon: '🌅', bonus: 8, description: 'Peach + Strawberry' },
+]
+
+const CUSTOMER_NAMES = ['Luna', 'Bubbles', 'Cocoa', 'Pudding', 'Mocha', 'Taro', 'Matcha', 'Latte', 'Chai', 'Cookie', 'Waffle', 'Sesame', 'Melon', 'Honey']
+
+function createSpecialOrder(servedCount) {
+  if (servedCount < 3) return null
+  if (Math.random() > 0.3) return null
+  return SPECIAL_ORDERS[Math.floor(Math.random() * SPECIAL_ORDERS.length)]
 }
 
 function ScreenFade({ children }) {
@@ -1366,8 +1399,10 @@ function TutorialScreen({ onComplete, onToggleMusic, musicEnabled, audioReady })
   const [fruit, setFruit] = useState(null)
   const [hits, setHits] = useState(0)
   const messages = [
-    { speaker: 'Boss', text: 'Fruits will appear on screen. Tap them as fast as you can to prepare drinks!' },
-    { speaker: 'Boss', text: "A new fruit appears every 2 seconds. Don't let them pile up!" },
+    { speaker: 'Boss', text: 'Tap fruits to prepare drinks! Every 3 fruits makes 1 boba tea. 🧋' },
+    { speaker: 'Boss', text: 'Customers are waiting! Serve them before they lose patience or you lose a life.' },
+    { speaker: 'Boss', text: 'Tap fast to build combos! 🔥 Every 5x combo earns bonus coins.' },
+    { speaker: 'Boss', text: 'Watch for golden ⭐ fruits — they give bonus coins and extra drink progress!' },
   ]
 
   useEffect(() => {
@@ -1473,12 +1508,22 @@ function GameplayScreen({
     nextCustomerId: 1,
     floaters: [],
     pops: [],
+    particles: [],
     combo: 0,
     comboTimer: 0,
+    maxCombo: 0,
+    goldenCaught: 0,
+    totalTaps: 0,
+    drinksServed: 0,
+    perfectWaves: 0,
+    livesLostThisWave: 0,
+    recentFruits: [],
     lastWaveBreak: 0,
     waveBreakPending: false,
     over: false,
     lifeLostFlash: false,
+    shakeIntensity: 0,
+    newAchievements: [],
   }))
   const finishedRef = useRef(false)
   const [paused, setPaused] = useState(false)
@@ -1500,6 +1545,7 @@ function GameplayScreen({
         const comboTimer = current.comboTimer > 0 ? current.comboTimer - 1 : 0
         const combo = comboTimer > 0 ? current.combo : 0
         const pops = current.pops.filter((p) => p.life > 0).map((p) => ({ ...p, life: p.life - 1 }))
+        const particles = current.particles.filter((p) => p.life > 0).map((p) => ({ ...p, life: p.life - 1, y: p.y - 0.5, x: p.x + p.dx }))
 
         const customers = current.customers
           .map((customer) => ({ ...customer, patience: customer.patience - 0.1 }))
@@ -1509,9 +1555,14 @@ function GameplayScreen({
         let readyDrinks = current.readyDrinks
         let served = current.served
         let coinsEarned = current.coinsEarned
+        let drinksServed = current.drinksServed
+        let livesLostThisWave = current.livesLostThisWave + lostLives
+        let perfectWaves = current.perfectWaves
         const floaters = current.floaters.filter((floater) => floater.life > 0).map((floater) => ({ ...floater, life: floater.life - 1 }))
         let activeCustomers = remainingCustomers
         let lifeLostFlash = current.lifeLostFlash
+        const shakeIntensity = Math.max(0, current.shakeIntensity - 0.5)
+        const newAchievements = current.newAchievements.filter((a) => a.life > 0).map((a) => ({ ...a, life: a.life - 1 }))
 
         if (lostLives > 0) {
           lifeLostFlash = true
@@ -1521,16 +1572,36 @@ function GameplayScreen({
         }
 
         if (readyDrinks > 0 && activeCustomers.length > 0) {
-          const tipValue = 10 + (upgrades.tips * 5) + abilityStats.tipBonus
+          const servedCustomer = activeCustomers[0]
+          let tipValue = 10 + (upgrades.tips * 5) + abilityStats.tipBonus
+          let serveText = `+${tipValue}`
+
+          if (servedCustomer.specialOrder) {
+            tipValue += servedCustomer.specialOrder.bonus
+            serveText = `${servedCustomer.specialOrder.icon} +${tipValue}`
+          }
+
           activeCustomers = activeCustomers.slice(1)
           readyDrinks -= 1
           served += 1
+          drinksServed += 1
           coinsEarned += tipValue
-          floaters.push({ id: `${Date.now()}-${served}`, text: `+${tipValue}`, life: 18 })
+          floaters.push({ id: `${Date.now()}-${served}`, text: serveText, life: 18 })
           SFX.serve()
         }
 
         const completedWave = served > 0 && served % 5 === 0 ? served / 5 : current.lastWaveBreak
+        let waveBreakPending = served > 0 && served % 5 === 0 && completedWave > current.lastWaveBreak
+
+        if (waveBreakPending && livesLostThisWave === 0) {
+          perfectWaves += 1
+          const perfectBonus = 15
+          coinsEarned += perfectBonus
+          floaters.push({ id: `perfect-${Date.now()}`, text: '✨ Perfect Wave! +15', life: 22 })
+        }
+        if (waveBreakPending) {
+          livesLostThisWave = 0
+        }
 
         return {
           ...current,
@@ -1538,15 +1609,21 @@ function GameplayScreen({
           served,
           coinsEarned,
           readyDrinks,
+          drinksServed,
+          livesLostThisWave,
+          perfectWaves,
           customers: activeCustomers,
           fruits: moveFruits(current.fruits, abilityStats.fruitSpeedMult),
           floaters,
           pops,
+          particles,
           combo,
           comboTimer,
           lifeLostFlash,
+          shakeIntensity,
+          newAchievements,
           lastWaveBreak: completedWave,
-          waveBreakPending: served > 0 && served % 5 === 0 && completedWave > current.lastWaveBreak,
+          waveBreakPending,
           over: lives <= 0,
         }
       })
@@ -1605,7 +1682,7 @@ function GameplayScreen({
         return {
           ...current,
           nextCustomerId: current.nextCustomerId + 1,
-          customers: [...current.customers, createCustomer(current.nextCustomerId, upgrades.patience + abilityStats.patienceBonus)],
+          customers: [...current.customers, createCustomer(current.nextCustomerId, upgrades.patience + abilityStats.patienceBonus, current.served)],
         }
       })
     }, delay)
@@ -1625,6 +1702,10 @@ function GameplayScreen({
         coinsEarned: game.coinsEarned,
         customersServed: game.served,
         wave: Math.floor(game.served / 5) + 1,
+        maxCombo: game.maxCombo,
+        goldenCaught: game.goldenCaught,
+        totalTaps: game.totalTaps,
+        perfectWaves: game.perfectWaves,
       })
     }, 900)
 
@@ -1643,8 +1724,11 @@ function GameplayScreen({
       let fruitProgress = current.fruitProgress + 1 + goldenBonus
       let readyDrinks = current.readyDrinks
       const newCombo = current.combo + 1
+      const maxCombo = Math.max(current.maxCombo, newCombo)
       const comboBonus = newCombo >= 5 && newCombo % 5 === 0 ? Math.floor(newCombo / 5) * 2 : 0
       let coinsEarned = current.coinsEarned + comboBonus + (tapped?.golden ? 5 : 0)
+      const goldenCaught = current.goldenCaught + (tapped?.golden ? 1 : 0)
+      const totalTaps = current.totalTaps + 1
 
       if (tapped?.golden) {
         SFX.powerUp()
@@ -1674,12 +1758,46 @@ function GameplayScreen({
         floaters.push({ id: `golden-${Date.now()}`, text: '⭐ +5 Golden!', life: 20 })
       }
 
+      const recentFruits = tapped && !tapped.golden
+        ? [...current.recentFruits, tapped.kind].slice(-3)
+        : current.recentFruits
+
       const prevDrinks = readyDrinks
+      let newParticles = [...current.particles]
       while (fruitProgress >= 3) {
         fruitProgress -= 3
         readyDrinks += 1
       }
-      if (readyDrinks > prevDrinks) SFX.drink()
+      if (readyDrinks > prevDrinks) {
+        SFX.drink()
+        for (let i = 0; i < 6; i++) {
+          newParticles.push({
+            id: `p-${Date.now()}-${i}`,
+            x: 50 + (Math.random() - 0.5) * 40,
+            y: 80 + Math.random() * 10,
+            dx: (Math.random() - 0.5) * 2,
+            kind: ['🫧', '✨', '🧋', '💫'][Math.floor(Math.random() * 4)],
+            life: 10 + Math.floor(Math.random() * 8),
+          })
+        }
+      }
+
+      let shakeIntensity = current.shakeIntensity
+      if (newCombo >= 10 && newCombo % 5 === 0) {
+        shakeIntensity = Math.min(8, newCombo / 2)
+      }
+
+      const runStats = { served: current.served, maxCombo, goldenCaught, wave: Math.floor(current.served / 5) + 1, perfectWaves: current.perfectWaves, coinsEarned }
+      const newAchievements = [...current.newAchievements]
+      for (const ach of ACHIEVEMENTS) {
+        if (ach.check(runStats) && !newAchievements.some((a) => a.id === ach.id)) {
+          const alreadyShown = current.newAchievements.some((a) => a.id === ach.id)
+          if (!alreadyShown) {
+            newAchievements.push({ ...ach, life: 30 })
+            SFX.powerUp()
+          }
+        }
+      }
 
       return {
         ...current,
@@ -1689,8 +1807,15 @@ function GameplayScreen({
         coinsEarned,
         pops,
         floaters,
+        particles: newParticles,
         combo: newCombo,
         comboTimer: abilityStats.comboTimerMax,
+        maxCombo,
+        goldenCaught,
+        totalTaps,
+        recentFruits,
+        shakeIntensity,
+        newAchievements,
       }
     })
   }
@@ -1718,6 +1843,10 @@ function GameplayScreen({
       coinsEarned: game.coinsEarned,
       customersServed: game.served,
       wave: Math.max(1, Math.ceil(game.served / 5)),
+      maxCombo: game.maxCombo,
+      goldenCaught: game.goldenCaught,
+      totalTaps: game.totalTaps,
+      perfectWaves: game.perfectWaves,
     })
   }
 
@@ -1801,7 +1930,9 @@ function GameplayScreen({
             {game.customers.map((customer) => (
               <div key={customer.id} className={`customer-card${customer.patience < customer.maxPatience * 0.3 ? ' customer-angry' : customer.patience < customer.maxPatience * 0.6 ? ' customer-warning' : ''}`}>
                 <div className="customer-face">{moodFromPatience(customer.patience, customer.maxPatience)}</div>
+                <div className="customer-name">{customer.name}</div>
                 {customer.patience < customer.maxPatience * 0.25 && <div className="customer-urgent">❗</div>}
+                {customer.specialOrder && <div className="special-order-badge" title={customer.specialOrder.description}>{customer.specialOrder.icon}</div>}
                 <div className="customer-bar">
                   <span style={{ width: `${Math.max(0, (customer.patience / customer.maxPatience) * 100)}%` }} />
                 </div>
@@ -1810,7 +1941,10 @@ function GameplayScreen({
             ))}
           </div>
 
-          <div className={`kitchen-playfield${game.lifeLostFlash ? ' playfield-flash' : ''}`}>
+          <div
+            className={`kitchen-playfield${game.lifeLostFlash ? ' playfield-flash' : ''}`}
+            style={game.shakeIntensity > 0 ? { transform: `translate(${(Math.random() - 0.5) * game.shakeIntensity}px, ${(Math.random() - 0.5) * game.shakeIntensity}px)` } : undefined}
+          >
             {game.fruits.map((fruit) => (
               <button
                 key={fruit.id}
@@ -1827,6 +1961,11 @@ function GameplayScreen({
                 {pop.kind}
               </div>
             ))}
+            {game.particles.map((p) => (
+              <div key={p.id} className="drink-particle" style={{ left: `${p.x}%`, top: `${p.y}%`, opacity: p.life / 15 }}>
+                {p.kind}
+              </div>
+            ))}
             {game.floaters.map((floater) => (
               <div key={floater.id} className="coin-floater" style={{ opacity: floater.life / 18 }}>
                 {floater.text}
@@ -1841,6 +1980,16 @@ function GameplayScreen({
               </div>
             )}
           </div>
+
+          {game.newAchievements.filter((a) => a.life > 15).map((ach) => (
+            <div key={ach.id} className="achievement-toast">
+              <span className="achievement-icon">{ach.icon}</span>
+              <div>
+                <strong>{ach.name}</strong>
+                <p>{ach.description}</p>
+              </div>
+            </div>
+          ))}
 
           <div className="play-hint">
             {wave <= 1 ? 'Tap fruit to make drinks. 3 fruits = 1 boba tea!' : `Wave ${wave} — keep tapping!`}
@@ -1949,6 +2098,7 @@ function GameOverSummaryScreen({
   audioReady,
 }) {
   const isNewBest = lastRun && lastRun.customersServed >= bestCustomers && lastRun.customersServed > 0
+  const earnedAchievements = lastRun ? ACHIEVEMENTS.filter((a) => a.check(lastRun)) : []
 
   return (
     <SceneShell onToggleMusic={onToggleMusic} musicEnabled={musicEnabled} audioReady={audioReady}>
@@ -1962,13 +2112,30 @@ function GameOverSummaryScreen({
             <div className="game-over-message">
               {lastRun?.reason === 'gameover' ? 'The kitchen got too busy!' : 'Great shift!'}
             </div>
-            {isNewBest && <div className="new-best-badge">New Best!</div>}
+            {isNewBest && <div className="new-best-badge">🏆 New Best!</div>}
             <div className="shop-summary game-over-stats">
-              <div className="result-chip"><span>Coins Earned</span><strong>{lastRun?.coinsEarned ?? 0} 🪙</strong></div>
-              <div className="result-chip"><span>Customers</span><strong>{lastRun?.customersServed ?? 0}</strong></div>
+              <div className="result-chip"><span>Coins</span><strong>{lastRun?.coinsEarned ?? 0} 🪙</strong></div>
+              <div className="result-chip"><span>Served</span><strong>{lastRun?.customersServed ?? 0}</strong></div>
               <div className="result-chip"><span>Wave</span><strong>{lastRun?.wave ?? 1}</strong></div>
-              <div className="result-chip"><span>Best Ever</span><strong>{bestCustomers}</strong></div>
+              <div className="result-chip"><span>Best</span><strong>{bestCustomers}</strong></div>
+              <div className="result-chip"><span>Max Combo</span><strong>🔥 {lastRun?.maxCombo ?? 0}</strong></div>
+              <div className="result-chip"><span>Golden</span><strong>⭐ {lastRun?.goldenCaught ?? 0}</strong></div>
+              <div className="result-chip"><span>Taps</span><strong>{lastRun?.totalTaps ?? 0}</strong></div>
+              <div className="result-chip"><span>Perfect</span><strong>✨ {lastRun?.perfectWaves ?? 0}</strong></div>
             </div>
+            {earnedAchievements.length > 0 && (
+              <div className="game-over-achievements">
+                <div className="achievements-title">Achievements</div>
+                <div className="achievements-grid">
+                  {earnedAchievements.map((ach) => (
+                    <div key={ach.id} className="achievement-badge">
+                      <span className="achievement-icon">{ach.icon}</span>
+                      <span className="achievement-name">{ach.name}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
             <div className="results-actions">
               <PixelButton onClick={onContinue} tone="green">Continue</PixelButton>
             </div>
