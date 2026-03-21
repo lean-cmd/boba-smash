@@ -2,34 +2,57 @@
 
 Pixel-art browser game built with Vite + React.
 
-## Local dev
+## Commands
 
 ```bash
 npm install
 npm run dev
-```
-
-## Build
-
-```bash
+npm run lint
 npm run build
 ```
 
-## GitHub + Vercel
+## Deploy
 
-This repo is set up so the app lives in the [`boba smash`](/Users/leanderblumenthal/chargame/boba%20smash) folder.
-
-When you create the Vercel project, set:
+Use Vercel with:
 
 - Framework: `Vite`
 - Root Directory: `boba smash`
 - Build Command: `npm run build`
 - Output Directory: `dist`
 
-Suggested GitHub repo name:
+## Claude Code Handoff
 
-- `boba-smash`
+### Core Files
 
-Suggested share URL:
+- App and screen flow: [src/App.jsx](/Users/leanderblumenthal/chargame/boba%20smash/src/App.jsx)
+- Styling and pixel scenes: [src/index.css](/Users/leanderblumenthal/chargame/boba%20smash/src/index.css)
+- Character render layer: [src/components/PixelCapybara.jsx](/Users/leanderblumenthal/chargame/boba%20smash/src/components/PixelCapybara.jsx)
+- Character data: [src/data/characters.js](/Users/leanderblumenthal/chargame/boba%20smash/src/data/characters.js)
+- Audio/theme loop: [src/hooks/useThemeSong.js](/Users/leanderblumenthal/chargame/boba%20smash/src/hooks/useThemeSong.js)
 
-- `boba-smash.vercel.app`
+### Current Features
+
+- Story intro through arrival at Boba Paradise
+- Tutorial with skip path
+- Kitchen gameplay with pause/shop
+- Cafe decor upgrades
+- First-end-shift Bob reward with `+500`
+- House select
+- Home hub
+- Free roam house decor
+- Gallery for character/accessory animation previews
+
+### Current Constraints
+
+- Most gameplay and screen state is still centralized in `App.jsx`.
+- Pixel movement is mostly CSS animation over extracted character art.
+- Keep the traced/reference look. Do not replace it with generic new vector art.
+
+### Validation
+
+Before handing off changes:
+
+```bash
+npm run lint
+npm run build
+```
