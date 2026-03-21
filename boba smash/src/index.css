@@ -593,22 +593,23 @@ input {
   width: var(--leg-width);
   height: var(--leg-height);
   border: 2px solid var(--leg-outline);
-  border-radius: 2px;
+  border-radius: 3px 3px 4px 4px;
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.14) 0 18%, rgba(255, 255, 255, 0) 18% 100%),
-    linear-gradient(180deg, var(--leg-fill) 0 62%, var(--leg-shadow) 62% 100%);
+    linear-gradient(180deg, rgba(255, 255, 255, 0.18) 0 18%, rgba(255, 255, 255, 0) 18% 100%),
+    linear-gradient(180deg, var(--leg-fill) 0 55%, var(--leg-shadow) 55% 100%);
   transform-origin: top center;
+  z-index: 2;
 }
 
 .pixel-leg::after {
   content: '';
   position: absolute;
-  left: -12%;
-  right: -8%;
-  bottom: -16%;
-  height: 18%;
+  left: -15%;
+  right: -10%;
+  bottom: -20%;
+  height: 24%;
   border: 2px solid var(--leg-outline);
-  border-radius: 2px;
+  border-radius: 3px;
   background: var(--leg-shadow);
 }
 
@@ -4041,6 +4042,7 @@ input {
 }
 
 .customer-card {
+  position: relative;
   min-width: 108px;
   display: grid;
   justify-items: center;
@@ -4048,6 +4050,7 @@ input {
   padding: 0.6rem;
   border: 4px solid #8b4715;
   background: rgba(255, 249, 228, 0.86);
+  transition: background 300ms, border-color 300ms;
 }
 
 .customer-face {
@@ -4084,6 +4087,87 @@ input {
   font-size: 0.86rem;
   color: #5aa43f;
   animation: burstRise 900ms ease-out forwards;
+}
+
+/* Fruit tap pop effect */
+.fruit-pop {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  font-size: 2.4rem;
+  pointer-events: none;
+  animation: fruitPop 400ms ease-out forwards;
+  z-index: 10;
+}
+
+@keyframes fruitPop {
+  0% { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+  50% { transform: translate(-50%, -50%) scale(1.8) rotate(15deg); opacity: 0.8; }
+  100% { transform: translate(-50%, -50%) scale(0.3) rotate(30deg); opacity: 0; }
+}
+
+/* Fruit bounce transition */
+.gameplay-fruit {
+  transition: left 80ms linear, top 80ms linear;
+}
+
+.gameplay-fruit:active {
+  transform: translate(-50%, -50%) scale(0.8);
+}
+
+/* Combo indicator */
+.combo-indicator {
+  position: absolute;
+  bottom: 0.8rem;
+  left: 50%;
+  transform: translateX(-50%);
+  font-family: var(--font-pixel);
+  font-size: 1.1rem;
+  color: #e65c00;
+  text-shadow: 0 2px 0 rgba(0,0,0,0.2);
+  animation: comboPulse 600ms ease-in-out infinite;
+  z-index: 10;
+  pointer-events: none;
+}
+
+@keyframes comboPulse {
+  0%, 100% { transform: translateX(-50%) scale(1); }
+  50% { transform: translateX(-50%) scale(1.15); }
+}
+
+/* Customer patience warnings */
+.customer-warning {
+  animation: customerWarn 600ms ease-in-out infinite;
+}
+
+.customer-angry {
+  animation: customerShake 200ms linear infinite;
+  border-color: #c0392b !important;
+  background: rgba(255, 220, 210, 0.92) !important;
+}
+
+.customer-urgent {
+  position: absolute;
+  top: -0.4rem;
+  right: -0.3rem;
+  font-size: 1rem;
+  animation: urgentBounce 400ms ease-in-out infinite;
+  z-index: 5;
+}
+
+@keyframes customerWarn {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-2px); }
+}
+
+@keyframes customerShake {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-3px); }
+  75% { transform: translateX(3px); }
+}
+
+@keyframes urgentBounce {
+  0%, 100% { transform: translateY(0) scale(1); }
+  50% { transform: translateY(-4px) scale(1.2); }
 }
 
 .pause-overlay {

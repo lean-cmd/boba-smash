@@ -168,13 +168,30 @@ function getFruitDelay(servedCustomers) {
   return table[tier]
 }
 
-function createFruit(id, width = 72, height = 56) {
+function createFruit(id) {
+  const angle = Math.random() * Math.PI * 2
+  const speed = 0.15 + Math.random() * 0.25
   return {
     id,
     kind: FRUITS[Math.floor(Math.random() * FRUITS.length)],
-    x: 10 + Math.random() * Math.max(20, width - 20),
-    y: 14 + Math.random() * Math.max(16, height - 16),
+    x: 10 + Math.random() * 80,
+    y: 10 + Math.random() * 80,
+    vx: Math.cos(angle) * speed,
+    vy: Math.sin(angle) * speed,
   }
+}
+
+function moveFruits(fruits) {
+  return fruits.map((f) => {
+    let { x, y, vx, vy } = f
+    x += vx
+    y += vy
+    if (x < 5 || x > 95) vx = -vx
+    if (y < 5 || y > 95) vy = -vy
+    x = Math.max(5, Math.min(95, x))
+    y = Math.max(5, Math.min(95, y))
+    return { ...f, x, y, vx, vy }
+  })
 }
 
 function createCustomer(id, patienceBonus) {
@@ -1392,6 +1409,9 @@ function GameplayScreen({
     customers: [],
     nextCustomerId: 1,
     floaters: [],
+    pops: [],
+    combo: 0,
+    comboTimer: 0,
     lastWaveBreak: 0,
     waveBreakPending: false,
     over: false,
@@ -1412,6 +1432,10 @@ function GameplayScreen({
         if (current.over) {
           return current
         }
+
+        const comboTimer = current.comboTimer > 0 ? current.comboTimer - 1 : 0
+        const combo = comboTimer > 0 ? current.combo : 0
+        const pops = current.pops.filter((p) => p.life > 0).map((p) => ({ ...p, life: p.life - 1 }))
 
         const customers = current.customers
           .map((customer) => ({ ...customer, patience: customer.patience - 0.1 }))
@@ -1442,7 +1466,11 @@ function GameplayScreen({
           coinsEarned,
           readyDrinks,
           customers: activeCustomers,
+          fruits: moveFruits(current.fruits),
           floaters,
+          pops,
+          combo,
+          comboTimer,
           lastWaveBreak: completedWave,
           waveBreakPending: served > 0 && served % 5 === 0 && completedWave > current.lastWaveBreak,
           over: lives <= 0,
@@ -1533,9 +1561,30 @@ function GameplayScreen({
         return current
       }
 
+      const tapped = current.fruits.find((fruit) => fruit.id === fruitId)
       const fruits = current.fruits.filter((fruit) => fruit.id !== fruitId)
       let fruitProgress = current.fruitProgress + 1
       let readyDrinks = current.readyDrinks
+      const newCombo = current.combo + 1
+      const comboBonus = newCombo >= 5 ? Math.floor(newCombo / 5) * 2 : 0
+      let coinsEarned = current.coinsEarned + comboBonus
+
+      const pops = [...current.pops]
+      if (tapped) {
+        pops.push({
+          id: `pop-${Date.now()}-${fruitId}`,
+          x: tapped.x,
+          y: tapped.y,
+          kind: tapped.kind,
+          life: 8,
+          combo: newCombo,
+        })
+      }
+
+      const floaters = [...current.floaters]
+      if (comboBonus > 0 && tapped) {
+        floaters.push({ id: `combo-${Date.now()}`, text: `🔥 x${newCombo} +${comboBonus}`, life: 18 })
+      }
 
       while (fruitProgress >= 3) {
         fruitProgress -= 3
@@ -1547,6 +1596,11 @@ function GameplayScreen({
         fruits,
         fruitProgress,
         readyDrinks,
+        coinsEarned,
+        pops,
+        floaters,
+        combo: newCombo,
+        comboTimer: 12,
       }
     })
   }
@@ -1647,8 +1701,9 @@ function GameplayScreen({
           </div>
           <div className="queue-strip">
             {game.customers.map((customer) => (
-              <div key={customer.id} className="customer-card">
+              <div key={customer.id} className={`customer-card${customer.patience < customer.maxPatience * 0.3 ? ' customer-angry' : customer.patience < customer.maxPatience * 0.6 ? ' customer-warning' : ''}`}>
                 <div className="customer-face">{moodFromPatience(customer.patience, customer.maxPatience)}</div>
+                {customer.patience < customer.maxPatience * 0.25 && <div className="customer-urgent">❗</div>}
                 <div className="customer-bar">
                   <span style={{ width: `${Math.max(0, (customer.patience / customer.maxPatience) * 100)}%` }} />
                 </div>
@@ -1669,11 +1724,19 @@ function GameplayScreen({
                 {fruit.kind}
               </button>
             ))}
+            {game.pops.map((pop) => (
+              <div key={pop.id} className="fruit-pop" style={{ left: `${pop.x}%`, top: `${pop.y}%`, opacity: pop.life / 8 }}>
+                {pop.kind}
+              </div>
+            ))}
             {game.floaters.map((floater) => (
               <div key={floater.id} className="coin-floater" style={{ opacity: floater.life / 18 }}>
                 {floater.text}
               </div>
             ))}
+            {game.combo >= 3 && (
+              <div className="combo-indicator">🔥 x{game.combo}</div>
+            )}
           </div>
 
           <div className="play-hint">
@@ -1906,6 +1969,9 @@ function WalkGalleryScreen({ onToggleMusic, musicEnabled, audioReady }) {
 
 function AppFooter({ screen, onOpenGallery, onReturnFromGallery }) {
   const viewingGallery = screen === SCREENS.gallery
+  const hideInGameplay = screen === SCREENS.gameplay
+
+  if (hideInGameplay) return null
 
   return (
     <footer className="app-footer">
