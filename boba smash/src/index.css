@@ -5256,6 +5256,35 @@ input {
   }
 }
 
+/* New variant sprites with built-in legs */
+.sprite-has-legs .pixel-sprite-frame {
+  z-index: 2;
+}
+
+.sprite-has-legs .pixel-sprite-image {
+  image-rendering: auto;
+}
+
+/* Walk animation for variant sprites (bob + leg squish) */
+[data-motion='walk'] .sprite-has-legs {
+  animation: variantWalk 0.45s steps(2, end) infinite;
+}
+
+@keyframes variantWalk {
+  0% { transform: translateY(0); }
+  50% { transform: translateY(-3px); }
+}
+
+/* Idle animation for variant sprites (gentle breathing) */
+[data-motion='idle'] .sprite-has-legs {
+  animation: variantIdle 2.4s ease-in-out infinite;
+}
+
+@keyframes variantIdle {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-2px); }
+}
+
 /* Screen fade transition */
 .screen-fade {
   animation: screenFadeIn 0.35s ease-out both;

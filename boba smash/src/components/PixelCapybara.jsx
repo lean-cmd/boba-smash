@@ -13,6 +13,16 @@ import chinoSceneCrop from '../assets/reference-crops/chino-scene-transparent.pn
 import starSceneCrop from '../assets/reference-crops/star-scene-transparent.png'
 import bobSceneCrop from '../assets/reference-crops/bob-scene-transparent.png'
 
+// New variant sprites (pre-rendered with accessories + legs)
+import starBoba from '../assets/characters/star/star-boba.png'
+import starSunglasses from '../assets/characters/star/star-sunglasses.png'
+import starBow from '../assets/characters/star/star-bow.png'
+import starCoconut from '../assets/characters/star/star-coconut.png'
+import starFlowerCrown from '../assets/characters/star/star-flower-crown.png'
+import starHat from '../assets/characters/star/star-hat.png'
+import starBase from '../assets/characters/star/star-base.png'
+import starScene from '../assets/characters/star/star-scene.png'
+
 const PIXEL_ART = {
   mochi: {
     cardSrc: card1Crop,
@@ -66,12 +76,22 @@ const PIXEL_ART = {
   },
   star: {
     cardSrc: card6Crop,
-    sceneSrc: starSceneCrop,
+    sceneSrc: starScene,
     anchors: {
       head: { x: 48, y: 17, size: '1.4rem' },
       face: { x: 54, y: 31, size: '1.2rem' },
       chest: { x: 58, y: 62, size: '1.3rem' },
       hand: { x: 79, y: 76, size: '1.45rem' },
+    },
+    variantSprites: {
+      base: starBase,
+      boba: starBoba,
+      sunglasses: starSunglasses,
+      bow: starBow,
+      coconut: starCoconut,
+      'flower-crown': starFlowerCrown,
+      hat: starHat,
+      apron: starBase,  // fallback for apron
     },
   },
   bob: {
@@ -353,6 +373,19 @@ function SpriteLegs({ characterId }) {
 
 function BitmapSprite({ characterId, label, source, accessory }) {
   const art = PIXEL_ART[characterId]
+
+  // New variant-based characters have pre-rendered accessories + legs
+  if (art.variantSprites) {
+    const variantSrc = (accessory && art.variantSprites[accessory]) ?? art.variantSprites.base ?? source
+    return (
+      <div className={`pixel-sprite sprite-${characterId} sprite-has-legs`}>
+        <div className="pixel-sprite-frame">
+          <img className="pixel-sprite-image" src={variantSrc} alt={label} draggable="false" />
+        </div>
+        <span className="pixel-sprite-shadow" aria-hidden="true" />
+      </div>
+    )
+  }
 
   return (
     <div className={`pixel-sprite sprite-${characterId}`}>
