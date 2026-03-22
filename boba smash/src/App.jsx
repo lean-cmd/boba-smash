@@ -2425,6 +2425,12 @@ export default function App() {
 
   return (
     <main className="app-shell">
+      <div className="boba-pearl-bg" aria-hidden="true">
+        {Array.from({ length: 8 }, (_, i) => <div key={i} className="boba-pearl-float" />)}
+      </div>
+      <div className="sakura-layer" aria-hidden="true">
+        {Array.from({ length: 8 }, (_, i) => <div key={i} className="sakura-petal" />)}
+      </div>
       <div className="pixel-scanlines" />
 
       {screen === SCREENS.title ? (
