@@ -2681,11 +2681,12 @@ input {
   left: 1rem;
   right: 1rem;
   bottom: 1rem;
+  z-index: 10;
   display: grid;
   gap: 0.5rem;
   padding: 1.1rem 1.2rem;
   border: 4px solid #7a4218;
-  background: linear-gradient(135deg, rgba(255, 252, 240, 0.97) 0%, rgba(255, 245, 220, 0.95) 100%);
+  background: linear-gradient(135deg, rgba(255, 252, 240, 0.98) 0%, rgba(255, 245, 220, 0.97) 100%);
   border-radius: 12px;
   text-align: left;
   box-shadow:
@@ -2921,12 +2922,12 @@ input {
 .actor {
   position: absolute;
   width: clamp(105px, 15vw, 165px);
-  z-index: 2;
+  z-index: 5;
 }
 
 .bob-actor {
   left: 18%;
-  bottom: 16%;
+  bottom: 26%;
   transition: transform 900ms steps(6, end);
 }
 
@@ -2936,17 +2937,17 @@ input {
 
 .reunion-player {
   left: 15%;
-  bottom: 18%;
+  bottom: 28%;
 }
 
 .reunion-bob {
   right: 16%;
-  bottom: 18%;
+  bottom: 28%;
 }
 
 .airport-player {
   left: 12%;
-  bottom: 17%;
+  bottom: 27%;
   transition: transform 1200ms steps(6, end);
 }
 
@@ -2956,23 +2957,23 @@ input {
 
 .inside-player {
   left: 18%;
-  bottom: 15%;
+  bottom: 28%;
   transform: none;
 }
 
 .cafe-player {
   left: 16%;
-  bottom: 16%;
+  bottom: 28%;
 }
 
 .cafe-bob {
   left: 36%;
-  bottom: 16%;
+  bottom: 28%;
 }
 
 .cafe-boss {
   right: 12%;
-  bottom: 18%;
+  bottom: 28%;
 }
 
 .jump {
@@ -3028,34 +3029,71 @@ input {
 
 .airport-exterior {
   background:
+    radial-gradient(circle at 80% 15%, rgba(255,240,180,0.35) 0%, transparent 25%),
     repeating-linear-gradient(90deg, #89daff 0 16px, #79d0f4 16px 32px),
-    linear-gradient(180deg, #89daff 0%, #8ce6ff 50%, #81d37d 50%, #78c26c 100%);
+    linear-gradient(180deg, #6ec8f5 0%, #a0e4ff 42%, #81d37d 42%, #5db85a 62%, #78c26c 62%, #f4dca4 88%, #f9efca 100%);
+}
+
+/* Airport runway markings */
+.airport-exterior::before {
+  content: '';
+  position: absolute;
+  bottom: 10%;
+  left: 10%;
+  right: 10%;
+  height: 4px;
+  background: repeating-linear-gradient(90deg, #fff 0 20px, transparent 20px 40px);
+  opacity: 0.4;
+  z-index: 1;
+}
+
+/* Airport windsock */
+.airport-exterior::after {
+  content: '🪁';
+  position: absolute;
+  top: 8%;
+  right: 8%;
+  font-size: 1.8rem;
+  animation: windsock 2s ease-in-out infinite alternate;
+  z-index: 1;
+}
+
+@keyframes windsock {
+  from { transform: rotate(-10deg); }
+  to { transform: rotate(10deg); }
 }
 
 .airport-building {
   position: absolute;
   left: 50%;
-  top: 18%;
+  top: 12%;
   width: min(72vw, 460px);
-  height: 48%;
+  height: 52%;
   transform: translateX(-50%);
   border: 5px solid #4a2a19;
+  border-radius: 4px 4px 0 0;
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.24) 0 12px, transparent 12px 100%),
-    repeating-linear-gradient(90deg, #dccdb7 0 18px, #c9bba9 18px 36px);
+    linear-gradient(180deg, rgba(255, 255, 255, 0.3) 0 16px, transparent 16px 100%),
+    repeating-linear-gradient(90deg, #e0d4c0 0 18px, #d2c4ae 18px 36px);
+  box-shadow: 0 8px 0 rgba(74, 42, 25, 0.2), 0 16px 30px rgba(0,0,0,0.1);
 }
 
 .airport-sign {
   position: absolute;
   left: 50%;
-  top: 1rem;
+  top: -0.5rem;
   transform: translateX(-50%);
-  padding: 0.45rem 1rem;
-  border: 4px solid #2d2030;
-  background: #4a72a5;
+  padding: 0.55rem 1.4rem;
+  border: 4px solid #2d3a50;
+  border-radius: 6px;
+  background: linear-gradient(180deg, #5a8abd 0%, #4a72a5 100%);
   color: #fffaf2;
   font-family: var(--font-pixel);
-  letter-spacing: 0.08em;
+  font-size: clamp(0.7rem, 1.5vw, 1rem);
+  letter-spacing: 0.15em;
+  text-shadow: 0 2px 0 rgba(0,0,0,0.3);
+  box-shadow: 0 4px 0 #3a5a80, 0 6px 12px rgba(0,0,0,0.15);
+  z-index: 3;
 }
 
 .airport-door {
@@ -3065,21 +3103,80 @@ input {
   width: 76px;
   height: 42%;
   transform: translateX(-50%);
-  background: #5a78a9;
+  background: linear-gradient(180deg, #6a8dbf, #5a78a9);
   border-left: 5px solid #3d557d;
   border-right: 5px solid #3d557d;
+  border-radius: 4px 4px 0 0;
+  box-shadow: inset 0 0 20px rgba(0,0,0,0.1);
+}
+
+/* Airport windows */
+.airport-building::after {
+  content: '';
+  position: absolute;
+  top: 30%;
+  left: 10%;
+  right: 10%;
+  height: 22%;
+  background:
+    repeating-linear-gradient(90deg,
+      #8ac4e8 0 30px, #4a2a19 30px 35px
+    );
+  border: 4px solid #4a2a19;
+  border-radius: 2px;
+  box-shadow: inset 0 0 10px rgba(0,0,0,0.15);
 }
 
 .airport-interior {
   background:
+    radial-gradient(ellipse at 50% 20%, rgba(255,255,255,0.2) 0%, transparent 50%),
     repeating-linear-gradient(90deg, #efe4d3 0 16px, #e4d5bf 16px 32px),
-    linear-gradient(180deg, #f4eddf 0%, #efe4d0 65%, #cfc4b1 65%, #c2b5a0 100%);
+    linear-gradient(180deg, #f4eddf 0%, #efe4d0 55%, #cfc4b1 55%, #c2b5a0 100%);
+}
+
+/* Interior floor tile pattern */
+.airport-interior::before {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 35%;
+  background:
+    repeating-linear-gradient(90deg, rgba(255,255,255,0.08) 0 24px, transparent 24px 48px),
+    repeating-linear-gradient(0deg, rgba(255,255,255,0.05) 0 24px, transparent 24px 48px);
+  z-index: 0;
+}
+
+/* Flight board display */
+.airport-interior::after {
+  content: '✈️ BOBA ISLAND';
+  position: absolute;
+  top: 6%;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 0.4rem 1.2rem;
+  background: linear-gradient(180deg, #1a1a2e, #16213e);
+  color: #4ade80;
+  font-family: var(--font-pixel);
+  font-size: clamp(0.5rem, 1.2vw, 0.7rem);
+  letter-spacing: 0.2em;
+  border: 3px solid #333;
+  border-radius: 4px;
+  box-shadow: 0 0 12px rgba(74, 222, 128, 0.2), 0 4px 8px rgba(0,0,0,0.3);
+  z-index: 1;
+  animation: flightBoardBlink 2s steps(1) infinite;
+}
+
+@keyframes flightBoardBlink {
+  0%, 80% { opacity: 1; }
+  85%, 95% { opacity: 0.7; }
 }
 
 .airport-counter {
   position: absolute;
   right: 10%;
-  bottom: 24%;
+  bottom: 32%;
   width: 220px;
   height: 120px;
   padding-top: 1rem;
@@ -3094,7 +3191,7 @@ input {
   position: absolute;
   left: 10%;
   right: 10%;
-  bottom: 14%;
+  bottom: 28%;
   display: flex;
   justify-content: space-between;
   gap: 0.75rem;
@@ -4326,12 +4423,33 @@ input {
 
 .queue-strip {
   display: flex;
-  flex-wrap: wrap;
-  gap: 0.8rem;
+  flex-wrap: nowrap;
+  gap: 0.6rem;
+  min-height: 130px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding-bottom: 0.4rem;
+  scrollbar-width: thin;
+  scrollbar-color: #d4a050 rgba(244, 223, 167, 0.3);
+  align-items: flex-start;
+}
+
+.queue-strip:empty::after {
+  content: '☕ Waiting for customers...';
+  display: grid;
+  place-items: center;
+  width: 100%;
+  min-height: 110px;
+  font-family: var(--font-pixel);
+  font-size: clamp(0.4rem, 1vw, 0.55rem);
+  color: #b89060;
+  opacity: 0.6;
+  text-align: center;
 }
 
 .customer-card {
   position: relative;
+  flex: 0 0 108px;
   min-width: 108px;
   display: grid;
   justify-items: center;
@@ -4343,13 +4461,13 @@ input {
   box-shadow:
     inset 0 1px 0 rgba(255,255,255,0.5),
     0 3px 8px rgba(0,0,0,0.08);
-  transition: background 300ms, border-color 300ms, transform 200ms ease, box-shadow 200ms ease;
-  animation: customerEnter 0.3s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+  transition: background 300ms, border-color 300ms, box-shadow 200ms ease;
+  animation: customerEnter 0.35s cubic-bezier(0.34, 1.56, 0.64, 1) both;
 }
 
 @keyframes customerEnter {
-  from { transform: translateY(-10px) scale(0.9); opacity: 0; }
-  to { transform: translateY(0) scale(1); opacity: 1; }
+  from { transform: scale(0.85) translateY(-8px); opacity: 0; }
+  to { transform: scale(1) translateY(0); opacity: 1; }
 }
 
 .customer-face {
@@ -5332,6 +5450,26 @@ input {
   min-width: 100px;
 }
 
+/* Customer type variants */
+.customer-vip {
+  border-color: #c89d4a !important;
+  background: linear-gradient(145deg, rgba(255, 248, 220, 0.98), rgba(255, 230, 170, 0.95)) !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.6),
+    0 0 12px rgba(255, 215, 0, 0.25),
+    0 3px 8px rgba(0,0,0,0.08) !important;
+}
+
+.customer-rush {
+  border-color: #c66030 !important;
+  animation: customerEnter 0.35s cubic-bezier(0.34, 1.56, 0.64, 1) both, rushPulse 1.2s ease-in-out infinite alternate !important;
+}
+
+@keyframes rushPulse {
+  from { box-shadow: inset 0 0 0 0 transparent, 0 3px 8px rgba(0,0,0,0.08); }
+  to { box-shadow: inset 0 0 8px rgba(255, 100, 50, 0.15), 0 3px 8px rgba(0,0,0,0.08); }
+}
+
 /* Customer names */
 .customer-name {
   font-family: 'Press Start 2P', monospace;
@@ -5505,10 +5643,12 @@ input {
 
   .queue-strip {
     gap: 0.3rem;
+    min-height: 90px;
   }
 
   .customer-card {
-    min-width: 65px;
+    flex: 0 0 72px;
+    min-width: 72px;
     padding: 0.2rem;
   }
 

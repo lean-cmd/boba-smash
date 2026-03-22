@@ -158,21 +158,39 @@ function getUpgradeCost(upgradeId, level) {
 
 function moodFromPatience(patience, maxPatience) {
   const ratio = patience / maxPatience
-  if (ratio > 0.8) return '😊'
+  if (ratio > 0.75) return '😊'
   if (ratio > 0.5) return '😐'
-  if (ratio > 0.25) return '😠'
+  if (ratio > 0.3) return '😟'
+  if (ratio > 0.15) return '😠'
   return '🤬'
 }
 
+// Customer personality types for variety
+const CUSTOMER_TYPES = [
+  { id: 'normal', patienceMult: 1, tipMult: 1, label: null },
+  { id: 'patient', patienceMult: 1.4, tipMult: 0.8, label: '🧘' },
+  { id: 'rush', patienceMult: 0.65, tipMult: 1.5, label: '⚡' },
+  { id: 'vip', patienceMult: 0.9, tipMult: 2.0, label: '👑' },
+]
+
+function getCustomerType(servedCount) {
+  if (servedCount < 5) return CUSTOMER_TYPES[0]
+  const roll = Math.random()
+  if (roll < 0.12) return CUSTOMER_TYPES[3]  // VIP
+  if (roll < 0.30) return CUSTOMER_TYPES[2]  // Rush
+  if (roll < 0.48) return CUSTOMER_TYPES[1]  // Patient
+  return CUSTOMER_TYPES[0]
+}
+
 function getFruitDelay(servedCustomers) {
-  const table = [2000, 1800, 1500, 1200, 1000, 850, 700, 500]
+  const table = [1900, 1700, 1400, 1200, 1000, 850, 720, 600, 500]
   const tier = Math.min(table.length - 1, Math.floor(servedCustomers / 5))
   return table[tier]
 }
 
 function createFruit(id, goldenChance = 0.05) {
   const angle = Math.random() * Math.PI * 2
-  const speed = 0.15 + Math.random() * 0.25
+  const speed = 0.18 + Math.random() * 0.22
   const isGolden = Math.random() < goldenChance
   return {
     id,
@@ -182,24 +200,28 @@ function createFruit(id, goldenChance = 0.05) {
     y: 10 + Math.random() * 80,
     vx: Math.cos(angle) * speed,
     vy: Math.sin(angle) * speed,
+    age: 0,
   }
 }
 
 function moveFruits(fruits, speedMult = 1) {
   return fruits.map((f) => {
     let { x, y, vx, vy } = f
+    const age = (f.age ?? 0) + 1
     x += vx * speedMult
     y += vy * speedMult
     if (x < 5 || x > 95) vx = -vx
     if (y < 5 || y > 95) vy = -vy
     x = Math.max(5, Math.min(95, x))
     y = Math.max(5, Math.min(95, y))
-    return { ...f, x, y, vx, vy }
-  })
+    return { ...f, x, y, vx, vy, age }
+  }).filter((f) => (f.age ?? 0) < 120) // fruits despawn after 12s
 }
 
 function createCustomer(id, patienceBonus, servedCount) {
-  const maxPatience = 8 + (patienceBonus * 0.5)
+  const type = getCustomerType(servedCount)
+  const basePatience = 8 + (patienceBonus * 0.5)
+  const maxPatience = Math.round(basePatience * type.patienceMult * 10) / 10
   const specialOrder = createSpecialOrder(servedCount ?? 0)
   return {
     id,
@@ -207,6 +229,7 @@ function createCustomer(id, patienceBonus, servedCount) {
     patience: maxPatience,
     maxPatience,
     specialOrder,
+    type,
   }
 }
 
@@ -256,12 +279,18 @@ const ACHIEVEMENTS = [
   { id: 'combo_20', name: 'Combo Legend', icon: '🌟', description: 'Reach a 20x combo', check: (s) => s.maxCombo >= 20 },
   { id: 'wave_3', name: 'Wave Rider', icon: '🌊', description: 'Reach wave 3', check: (s) => s.wave >= 3 },
   { id: 'wave_5', name: 'Wave Master', icon: '🏄', description: 'Reach wave 5', check: (s) => s.wave >= 5 },
+  { id: 'wave_8', name: 'Wave Legend', icon: '🌊', description: 'Reach wave 8', check: (s) => s.wave >= 8 },
   { id: 'golden_5', name: 'Gold Rush', icon: '⭐', description: 'Catch 5 golden fruits in one run', check: (s) => s.goldenCaught >= 5 },
+  { id: 'golden_15', name: 'Golden Touch', icon: '💫', description: 'Catch 15 golden fruits in one run', check: (s) => s.goldenCaught >= 15 },
   { id: 'serve_10', name: 'Busy Barista', icon: '☕', description: 'Serve 10 customers in one run', check: (s) => s.served >= 10 },
   { id: 'serve_25', name: 'Cafe Hero', icon: '🦸', description: 'Serve 25 customers in one run', check: (s) => s.served >= 25 },
+  { id: 'serve_50', name: 'Boba Master', icon: '🏆', description: 'Serve 50 customers in one run', check: (s) => s.served >= 50 },
   { id: 'perfect_wave', name: 'Perfect Wave', icon: '✨', description: 'Complete a wave with no life loss', check: (s) => s.perfectWaves >= 1 },
+  { id: 'perfect_3', name: 'Triple Perfect', icon: '💎', description: 'Get 3 perfect waves in one run', check: (s) => s.perfectWaves >= 3 },
   { id: 'coins_100', name: 'Coin Collector', icon: '💰', description: 'Earn 100 coins in one run', check: (s) => s.coinsEarned >= 100 },
   { id: 'coins_500', name: 'Rich Capy', icon: '🤑', description: 'Earn 500 coins in one run', check: (s) => s.coinsEarned >= 500 },
+  { id: 'vip_serve', name: 'VIP Service', icon: '👑', description: 'Serve a VIP customer', check: (s) => s.vipServed >= 1 },
+  { id: 'speed_demon', name: 'Speed Demon', icon: '⚡', description: 'Tap 100 fruits in one run', check: (s) => s.totalTaps >= 100 },
 ]
 
 const SPECIAL_ORDERS = [
@@ -1133,8 +1162,10 @@ function AirportScreen({ playerCharacter, accessoryId, onContinue, onToggleMusic
         <div className="board-frame stage-frame">
           {phase === 'outside' || phase === 'walking' ? (
             <div className="story-stage airport-exterior">
+              <div className="pixel-cloud cloud-a" />
+              <div className="pixel-cloud cloud-b" />
               <div className="airport-building">
-                <div className="airport-sign">AIRPORT</div>
+                <div className="airport-sign">✈️ AIRPORT</div>
                 <div className="airport-door" />
               </div>
               <div className={`actor airport-player ${phase === 'walking' ? 'move-to-door' : ''}`}>
@@ -1517,6 +1548,7 @@ function GameplayScreen({
     drinksServed: 0,
     perfectWaves: 0,
     livesLostThisWave: 0,
+    vipServed: 0,
     recentFruits: [],
     lastWaveBreak: 0,
     waveBreakPending: false,
@@ -1558,6 +1590,7 @@ function GameplayScreen({
         let drinksServed = current.drinksServed
         let livesLostThisWave = current.livesLostThisWave + lostLives
         let perfectWaves = current.perfectWaves
+        let vipServed = current.vipServed
         const floaters = current.floaters.filter((floater) => floater.life > 0).map((floater) => ({ ...floater, life: floater.life - 1 }))
         let activeCustomers = remainingCustomers
         let lifeLostFlash = current.lifeLostFlash
@@ -1573,19 +1606,25 @@ function GameplayScreen({
 
         if (readyDrinks > 0 && activeCustomers.length > 0) {
           const servedCustomer = activeCustomers[0]
-          let tipValue = 10 + (upgrades.tips * 5) + abilityStats.tipBonus
+          const customerTipMult = servedCustomer.type?.tipMult ?? 1
+          let tipValue = Math.round((10 + (upgrades.tips * 5) + abilityStats.tipBonus) * customerTipMult)
           let serveText = `+${tipValue}`
 
           if (servedCustomer.specialOrder) {
             tipValue += servedCustomer.specialOrder.bonus
             serveText = `${servedCustomer.specialOrder.icon} +${tipValue}`
           }
+          if (servedCustomer.type?.id === 'vip') {
+            serveText = `👑 ${serveText}`
+          }
 
+          const wasVip = servedCustomer.type?.id === 'vip'
           activeCustomers = activeCustomers.slice(1)
           readyDrinks -= 1
           served += 1
           drinksServed += 1
           coinsEarned += tipValue
+          if (wasVip) vipServed += 1
           floaters.push({ id: `${Date.now()}-${served}`, text: serveText, life: 18 })
           SFX.serve()
         }
@@ -1612,6 +1651,7 @@ function GameplayScreen({
           drinksServed,
           livesLostThisWave,
           perfectWaves,
+          vipServed,
           customers: activeCustomers,
           fruits: moveFruits(current.fruits, abilityStats.fruitSpeedMult),
           floaters,
@@ -1787,7 +1827,7 @@ function GameplayScreen({
         shakeIntensity = Math.min(8, newCombo / 2)
       }
 
-      const runStats = { served: current.served, maxCombo, goldenCaught, wave: Math.floor(current.served / 5) + 1, perfectWaves: current.perfectWaves, coinsEarned }
+      const runStats = { served: current.served, maxCombo, goldenCaught, wave: Math.floor(current.served / 5) + 1, perfectWaves: current.perfectWaves, coinsEarned, vipServed: current.vipServed, totalTaps }
       const newAchievements = [...current.newAchievements]
       for (const ach of ACHIEVEMENTS) {
         if (ach.check(runStats) && !newAchievements.some((a) => a.id === ach.id)) {
@@ -1928,9 +1968,9 @@ function GameplayScreen({
           </div>
           <div className="queue-strip">
             {game.customers.map((customer) => (
-              <div key={customer.id} className={`customer-card${customer.patience < customer.maxPatience * 0.3 ? ' customer-angry' : customer.patience < customer.maxPatience * 0.6 ? ' customer-warning' : ''}`}>
+              <div key={customer.id} className={`customer-card${customer.patience < customer.maxPatience * 0.3 ? ' customer-angry' : customer.patience < customer.maxPatience * 0.6 ? ' customer-warning' : ''}${customer.type?.id === 'vip' ? ' customer-vip' : customer.type?.id === 'rush' ? ' customer-rush' : ''}`}>
                 <div className="customer-face">{moodFromPatience(customer.patience, customer.maxPatience)}</div>
-                <div className="customer-name">{customer.name}</div>
+                <div className="customer-name">{customer.type?.label ? `${customer.type.label} ` : ''}{customer.name}</div>
                 {customer.patience < customer.maxPatience * 0.25 && <div className="customer-urgent">❗</div>}
                 {customer.specialOrder && <div className="special-order-badge" title={customer.specialOrder.description}>{customer.specialOrder.icon}</div>}
                 <div className="customer-bar">
